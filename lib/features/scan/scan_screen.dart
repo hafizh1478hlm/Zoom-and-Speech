@@ -1,14 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/services/ocr_service.dart';
 import '../../core/theme/app_colors.dart';
 
 class ScanScreen extends StatefulWidget {
-  final Function(XFile image)? onImageSelected;
+  final Function(XFile image, OcrResult ocrResult)? onOcrCompleted;
 
   const ScanScreen({
     super.key,
-    this.onImageSelected,
+    this.onOcrCompleted,
   });
 
   @override
@@ -17,13 +18,28 @@ class ScanScreen extends StatefulWidget {
 
 class _ScanScreenState extends State<ScanScreen> {
   final ImagePicker _picker = ImagePicker();
+  final OcrService _ocrService = OcrService();
+
   XFile? _selectedImage;
   bool _isLoading = false;
+  String _loadingMessage = '';
   int _currentNavIndex = 0;
 
-  Future<void> _pickImage(ImageSource source) async {
+  @override
+  void dispose() {
+    _ocrService.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndProcessImage(ImageSource source) async {
     try {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _loadingMessage = source == ImageSource.camera
+            ? 'Membuka kamera...'
+            : 'Membuka galeri...';
+      });
+
       final XFile? image = await _picker.pickImage(
         source: source,
         maxWidth: 1920,
@@ -31,22 +47,35 @@ class _ScanScreenState extends State<ScanScreen> {
         imageQuality: 90,
       );
 
-      if (image != null) {
-        setState(() {
-          _selectedImage = image;
-        });
+      if (image == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
 
-        if (widget.onImageSelected != null) {
-          widget.onImageSelected!(image);
+      setState(() {
+        _selectedImage = image;
+        _loadingMessage = 'Membaca tulisan pada gambar (OCR)...';
+      });
+
+      // Proses OCR (US-02)
+      final OcrResult result = await _ocrService.processImage(image.path);
+
+      if (!mounted) return;
+
+      if (widget.onOcrCompleted != null) {
+        widget.onOcrCompleted!(image, result);
+      } else {
+        if (result.isSuccess) {
+          _showOcrSuccessDialog(image, result);
         } else {
-          _showImageSelectedDialog(image);
+          _showOcrFailedDialog(result.errorMessage ?? 'Gagal membaca teks.');
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal mengakses ${source == ImageSource.camera ? "kamera" : "galeri"}: $e'),
+            content: Text('Terjadi kesalahan: $e'),
             backgroundColor: AppColors.accent,
           ),
         );
@@ -58,40 +87,74 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
-  void _showImageSelectedDialog(XFile image) {
+  void _showOcrSuccessDialog(XFile image, OcrResult result) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: AppColors.surface,
-        title: const Text(
-          'Foto Berhasil Diambil!',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(image.path),
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Foto siap diproses dengan OCR pada tahap berikutnya.',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textSecondary,
+        title: Row(
+          children: const [
+            Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Teks Berhasil Dibaca!',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
           ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  File(image.path),
+                  height: 120,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Teks yang ditemukan:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 180),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    result.fullText,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.4,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -100,91 +163,59 @@ class _ScanScreenState extends State<ScanScreen> {
               setState(() => _selectedImage = null);
             },
             child: const Text(
-              'Foto Ulang',
+              'Scan Ulang',
               style: TextStyle(color: AppColors.accent, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: const Text('Lanjut ke Hasil'),
           ),
         ],
       ),
     );
   }
 
-  void _showSourceChoiceSheet() {
-    showModalBottomSheet(
+  void _showOcrFailedDialog(String message) {
+    showDialog(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      backgroundColor: AppColors.surface,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.textSecondary.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppColors.surface,
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: AppColors.accent, size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Teks Tidak Terdeteksi',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: AppColors.textPrimary,
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Pilih Sumber Foto',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
-                  ),
-                  leading: const Icon(Icons.camera_alt_rounded, size: 32, color: AppColors.primary),
-                  title: const Text(
-                    'Kamera HP',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
-                  subtitle: const Text('Jepret langsung objek teks'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
-                  ),
-                  leading: const Icon(Icons.photo_library_rounded, size: 32, color: AppColors.primary),
-                  title: const Text(
-                    'Galeri Foto',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
-                  subtitle: const Text('Pilih foto dari album HP'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-              ],
+              ),
             ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 16,
+            height: 1.4,
+            color: AppColors.textSecondary,
           ),
-        );
-      },
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() => _selectedImage = null);
+            },
+            child: const Text('Coba Lagi'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -220,7 +251,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Isi preview: Foto hasil jepretan atau ilustrasi panduan
+                      // Preview Gambar atau Mockup Panduan
                       if (_selectedImage != null)
                         Image.file(
                           File(_selectedImage!.path),
@@ -267,6 +298,32 @@ class _ScanScreenState extends State<ScanScreen> {
                                 ),
                               ],
                             ),
+                          ),
+                        ),
+
+                      // Loading Overlay saat OCR berjalan
+                      if (_isLoading)
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CircularProgressIndicator(
+                                strokeWidth: 3.5,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _loadingMessage,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
 
@@ -356,21 +413,15 @@ class _ScanScreenState extends State<ScanScreen> {
 
               // Tombol Utama: Ambil Foto
               FilledButton.icon(
-                onPressed: _isLoading ? null : () => _pickImage(ImageSource.camera),
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                      )
-                    : const Icon(Icons.camera_alt_rounded, size: 28),
-                label: Text(_isLoading ? 'Membuka Kamera...' : 'Ambil Foto'),
+                onPressed: _isLoading ? null : () => _pickAndProcessImage(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt_rounded, size: 28),
+                label: const Text('Ambil Foto'),
               ),
               const SizedBox(height: 10),
 
-              // Opsi Pendukung: Pilih dari Galeri (Sesuai US-01)
+              // Opsi Pendukung: Pilih dari Galeri
               OutlinedButton.icon(
-                onPressed: _isLoading ? null : () => _pickImage(ImageSource.gallery),
+                onPressed: _isLoading ? null : () => _pickAndProcessImage(ImageSource.gallery),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
                   side: const BorderSide(color: AppColors.primary, width: 1.8),
@@ -445,7 +496,6 @@ class _CornerBracketsOverlay extends StatelessWidget {
 
     return Stack(
       children: [
-        // Top-Left
         Positioned(
           top: 0,
           left: 0,
@@ -461,7 +511,6 @@ class _CornerBracketsOverlay extends StatelessWidget {
             ),
           ),
         ),
-        // Top-Right
         Positioned(
           top: 0,
           right: 0,
@@ -477,7 +526,6 @@ class _CornerBracketsOverlay extends StatelessWidget {
             ),
           ),
         ),
-        // Bottom-Left
         Positioned(
           bottom: 0,
           left: 0,
@@ -493,7 +541,6 @@ class _CornerBracketsOverlay extends StatelessWidget {
             ),
           ),
         ),
-        // Bottom-Right
         Positioned(
           bottom: 0,
           right: 0,
@@ -513,4 +560,3 @@ class _CornerBracketsOverlay extends StatelessWidget {
     );
   }
 }
-

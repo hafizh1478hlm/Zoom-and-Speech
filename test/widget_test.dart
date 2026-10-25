@@ -8,5 +8,3 @@ void main() {
     expect(find.text('Ambil Foto'), findsOneWidget);
   });
 }
-
-}
