@@ -25,6 +25,9 @@ class _ScanScreenState extends State<ScanScreen> {
   String _loadingMessage = '';
   int _currentNavIndex = 0;
 
+  // US-10: mengingat sumber gambar terakhir (kamera/galeri)
+  ImageSource _lastSource = ImageSource.camera;
+
   @override
   void dispose() {
     _ocrService.dispose();
@@ -32,6 +35,8 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> _pickAndProcessImage(ImageSource source) async {
+    _lastSource = source;
+
     try {
       setState(() {
         _isLoading = true;
@@ -74,8 +79,8 @@ class _ScanScreenState extends State<ScanScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Terjadi kesalahan: $e'),
+          const SnackBar(
+            
             backgroundColor: AppColors.accent,
           ),
         );
@@ -207,13 +212,24 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
         ),
         actions: [
-          FilledButton(
+          TextButton(
             onPressed: () {
               Navigator.pop(context);
               setState(() => _selectedImage = null);
             },
-            child: const Text('Coba Lagi'),
+              child: const Text(
+                'Tutup',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
           ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() => _selectedImage = null);
+                  _pickAndProcessImage(_lastSource);
+                },
+                child: const Text('Ambil Ulang'),
+              ),
         ],
       ),
     );
