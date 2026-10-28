@@ -1,7 +1,6 @@
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Pilihan kecepatan bicara (US-07, AC 1).
 enum SpeechSpeed {
   slow('Lambat', 0.3),
   normal('Normal', 0.45),
@@ -12,8 +11,6 @@ enum SpeechSpeed {
   const SpeechSpeed(this.label, this.rate);
 }
 
-/// Mengatur suara pembacaan teks.
-/// terpisah dari volume sistem HP (US-07, AC 2).
 class TtsService {
   TtsService._();
   static final TtsService instance = TtsService._();
