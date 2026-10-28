@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'features/scan/scan_screen.dart';
+import 'features/welcome/welcome_screen.dart';
 
 class ZoomAndSpeechApp extends StatelessWidget {
   const ZoomAndSpeechApp({super.key});
@@ -11,7 +11,7 @@ class ZoomAndSpeechApp extends StatelessWidget {
       title: 'Zoom Or Speech',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const ScanScreen(),
+      home: const WelcomeScreen(),
     );
   }
 }
