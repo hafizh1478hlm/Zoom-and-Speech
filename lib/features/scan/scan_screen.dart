@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/ocr_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../settings/voice_settings_screen.dart';
 
 class ScanScreen extends StatefulWidget {
   final Function(XFile image, OcrResult ocrResult)? onOcrCompleted;
@@ -23,7 +24,7 @@ class _ScanScreenState extends State<ScanScreen> {
   XFile? _selectedImage;
   bool _isLoading = false;
   String _loadingMessage = '';
-  int _currentNavIndex = 0;
+  final int _currentNavIndex = 0;
 
   // US-10: mengingat sumber gambar terakhir (kamera/galeri)
   ImageSource _lastSource = ImageSource.camera;
@@ -76,16 +77,16 @@ class _ScanScreenState extends State<ScanScreen> {
           _showOcrFailedDialog(result.errorMessage ?? 'Gagal membaca teks.');
         }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            
-            backgroundColor: AppColors.accent,
-          ),
-        );
-      }
-    } finally {
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Terjadi kesalahan saat membaca gambar. Silakan coba lagi.'),
+              backgroundColor: AppColors.accent,
+            ),
+          );
+        }
+      } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -473,7 +474,12 @@ class _ScanScreenState extends State<ScanScreen> {
         child: BottomNavigationBar(
           currentIndex: _currentNavIndex,
           onTap: (index) {
-            setState(() => _currentNavIndex = index);
+            if (index == 2) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const VoiceSettingsScreen()),
+                );
+            }
           },
           backgroundColor: AppColors.surface,
           selectedItemColor: AppColors.primary,
