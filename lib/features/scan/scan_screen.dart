@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/ocr_service.dart';
+import '../../core/services/tts_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../settings/voice_settings_screen.dart';
 
@@ -163,8 +164,19 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () => TtsService.instance.speak(result.fullText),
+              icon: const Icon(Icons.volume_up_rounded),
+              label: const Text('Bacakan'),
+          ),
+          TextButton.icon(
+            onPressed: () => TtsService.instance.stop(),
+              icon: const Icon(Icons.stop_rounded),
+              label: const Text('Berhenti'),
+          ),
           TextButton(
             onPressed: () {
+              TtsService.instance.stop();
               Navigator.pop(context);
               setState(() => _selectedImage = null);
             },
@@ -174,7 +186,10 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              TtsService.instance.stop();
+              Navigator.pop(context);
+            },
             child: const Text('Lanjut ke Hasil'),
           ),
         ],
