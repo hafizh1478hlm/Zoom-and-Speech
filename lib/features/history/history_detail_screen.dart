@@ -1,22 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/services/history_service.dart';
-import '../../core/services/tts_service.dart';
+import 'voice_controls.dart';
 
-class HistoryDetailScreen extends StatefulWidget {
+class HistoryDetailScreen extends StatelessWidget {
   final HistoryItem item;
 
   const HistoryDetailScreen({super.key, required this.item});
-
-  @override
-  State<HistoryDetailScreen> createState() => _HistoryDetailScreenState();
-}
-
-class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
-  @override
-  void dispose() {
-    TtsService.instance.stop();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,31 +19,20 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(widget.item.formattedDate, style: textTheme.bodySmall),
+              Text(item.formattedDate, style: textTheme.bodySmall),
               const SizedBox(height: 12),
               Expanded(
                 child: SingleChildScrollView(
                   child: SelectableText(
-                    widget.item.text,
+                    item.text,
                     style: textTheme.bodyLarge,
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () => TtsService.instance.speak(widget.item.text),
-                icon: const Icon(Icons.volume_up_rounded, size: 28),
-                label: const Text('Bacakan'),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () => TtsService.instance.stop(),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-                icon: const Icon(Icons.stop_rounded, size: 24),
-                label: const Text('Berhenti'),
-              ),
+
+              // US-07: kecepatan, volume, Bacakan, Berhenti
+              VoiceControls(text: item.text),
             ],
           ),
         ),

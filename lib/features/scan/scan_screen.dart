@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/services/history_service.dart';
 import '../../core/services/ocr_service.dart';
 import '../../core/services/tts_service.dart';
 import '../../core/theme/app_colors.dart';
-import '../settings/voice_settings_screen.dart';
+import '../history/history_screen.dart';
+
 
 class ScanScreen extends StatefulWidget {
   final Function(XFile image, OcrResult ocrResult)? onOcrCompleted;
@@ -69,6 +71,12 @@ class _ScanScreenState extends State<ScanScreen> {
 
       if (!mounted) return;
 
+      // Simpan ke riwayat (hanya tersimpan jika pengguna login Google)    
+      if (result.isSuccess) {
+        await HistoryService.instance.add(result.fullText);
+        if (!mounted) return; 
+      }
+
       if (widget.onOcrCompleted != null) {
         widget.onOcrCompleted!(image, result);
       } else {
@@ -94,10 +102,17 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
-  void _showOcrSuccessDialog(XFile image, OcrResult result) {
+  Future<void> _showOcrSuccessDialog(XFile image, OcrResult result) async {
+    await TtsService.instance.init();
+    if (!mounted) return;
+    
+    double volume = TtsService.instance.volume;
+    SpeechSpeed speed = TtsService.instance.speed;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: AppColors.surface,
         title: Row(
@@ -160,6 +175,48 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 14),
+              const Text(
+                'Kecepatan suara',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<SpeechSpeed>(
+                  showSelectedIcon: false,
+                  segments: SpeechSpeed.values
+                     .map((s) => ButtonSegment(value: s, label: Text(s.label)))
+                     .toList(),
+                  selected: {speed},
+                  onSelectionChanged: (selection) {
+                    final chosen = selection.first;
+                    setDialogState(() => speed = chosen);
+                    TtsService.instance.setSpeed(chosen);
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.volume_up_rounded, size: 22),
+                  Expanded(
+                    child: Slider(
+                      value: volume,
+                      min: 0.1,
+                      max: 1.0,
+                      divisions: 9,
+                      label: '${(volume * 100).round()}%',
+                      onChanged: (v) => setDialogState(() => volume = v),
+                      onChangeEnd: (v) => TtsService.instance.setVolume(v),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -194,6 +251,7 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
         ],
       ),
+     ),
     );
   }
 
@@ -312,7 +370,7 @@ class _ScanScreenState extends State<ScanScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'KOMPOSISI',
+                                  'SCAN TEKS',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -321,7 +379,7 @@ class _ScanScreenState extends State<ScanScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Tepung terigu, gula, minyak nabati, susu bubuk, garam, pengembang (E500)...',
+                                  'Contoh : Tepung terigu, gula, minyak nabati, susu bubuk, garam, pengembang (E500)...',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textSecondary.withValues(alpha: 0.9),
@@ -489,11 +547,11 @@ class _ScanScreenState extends State<ScanScreen> {
         child: BottomNavigationBar(
           currentIndex: _currentNavIndex,
           onTap: (index) {
-            if (index == 2) {
+            if (index == 1) {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const VoiceSettingsScreen()),
-                );
+                MaterialPageRoute(builder: (_) => const HistoryScreen()),
+              );
             }
           },
           backgroundColor: AppColors.surface,

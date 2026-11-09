@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HistoryItem {
@@ -24,7 +25,6 @@ class HistoryItem {
         createdAt: DateTime.parse(json['createdAt'] as String),
       );
 
-  /// Format: dd/MM/yyyy HH:mm
   String get formattedDate {
     String two(int n) => n.toString().padLeft(2, '0');
     final d = createdAt;
@@ -32,17 +32,23 @@ class HistoryItem {
   }
 }
 
-/// Menyimpan hasil pemindaian ke riwayat (disimpan lokal di perangkat).
 class HistoryService {
   HistoryService._();
   static final HistoryService instance = HistoryService._();
 
-  static const _key = 'scan_history';
+  String? get _key {
+    final email = FirebaseAuth.instance.currentUser?.email;
+    return email == null ? null : 'scan_history_$email';
+  }
 
-  /// Semua riwayat, diurutkan dari yang terbaru (US-08, AC 2).
+  bool get isLoggedIn => _key != null;
+
   Future<List<HistoryItem>> getAll() async {
+    final key = _key;
+    if (key == null) return []; 
+
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
+    final raw = prefs.getString(key);
     if (raw == null || raw.isEmpty) return [];
 
     try {
@@ -58,6 +64,8 @@ class HistoryService {
 
   /// Menambah hasil scan baru ke riwayat (US-08, AC 1).
   Future<void> add(String text) async {
+    if (_key == null) return;
+
     final items = await getAll();
     final now = DateTime.now();
     items.add(HistoryItem(
@@ -70,15 +78,28 @@ class HistoryService {
 
   /// Menghapus satu item riwayat (US-09).
   Future<void> delete(String id) async {
+    if (_key == null) return;
+
     final items = await getAll();
     items.removeWhere((e) => e.id == id);
     await _save(items);
   }
 
+  Future<void> clearAll() async {
+    final key = _key;
+    if (key == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(key);
+  }
+
   Future<void> _save(List<HistoryItem> items) async {
+    final key = _key;
+    if (key == null) return;
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      _key,
+      key,
       jsonEncode(items.map((e) => e.toJson()).toList()),
     );
   }

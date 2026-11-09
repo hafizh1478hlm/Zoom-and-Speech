@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../scan/scan_screen.dart';
 
 /// Halaman pembuka: pengguna bisa masuk dengan Google
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
 
-  void _goToScan(BuildContext context) {
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  bool _loading = false;
+
+  void _goToScan() {
     // pushReplacement agar tombol back dari halaman scan
     Navigator.pushReplacement(
       context,
@@ -14,9 +22,30 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  void _signInWithGoogle(BuildContext context) {
-    // TODO: sambungkan ke Google Sign-In.
-    _goToScan(context);
+  Future<void> _signInWithGoogle() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+
+    try {
+      final user = await AuthService.instance.signInWithGoogle();
+      if (!mounted) return;
+
+      if (user == null) {
+        // Pengguna menutup pemilih akun: tetap di halaman ini.
+        setState(() => _loading = false);
+        return;
+      }
+
+      _goToScan();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal masuk dengan Google. Coba lagi.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -78,30 +107,42 @@ class WelcomeScreen extends StatelessWidget {
 
               // Tombol masuk dengan Google
               FilledButton.icon(
-                onPressed: () => _signInWithGoogle(context),
-                icon: Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    'G',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-                label: const Text('Masuk dengan Google'),
+                onPressed: _loading ? null : _signInWithGoogle,
+                icon: _loading
+                    ? const SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: Padding(
+                          padding: EdgeInsets.all(6),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Text(
+                          'G',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                label: Text(_loading ? 'Memproses...' : 'Masuk dengan Google'),
               ),
               const SizedBox(height: 8),
 
               TextButton(
-                onPressed: () => _goToScan(context),
+                onPressed: _loading ? null : _goToScan,
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   minimumSize: const Size.fromHeight(52),

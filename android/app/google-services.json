@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "14342840481",
+    "project_id": "zoom-or-speech-cf1ea",
+    "storage_bucket": "zoom-or-speech-cf1ea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:14342840481:android:512ee4e8856aeebd5490e0",
+        "android_client_info": {
+          "package_name": "id.ac.polibatam.zoom_and_speech"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "14342840481-a0l39agjl4hnalrn5ftgc7jskjeisven.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "id.ac.polibatam.zoom_and_speech",
+            "certificate_hash": "c03452abbe92f7c4f72edc52e3e8a9c537e69ae1"
+          }
+        },
+        {
+          "client_id": "14342840481-kdnnndhu85hd8ah0g1mkv0polvh8ai1d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDBVF1lYg5kDI4MuurMzw24TFDJkHk3ba8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "14342840481-kdnnndhu85hd8ah0g1mkv0polvh8ai1d.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
